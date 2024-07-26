@@ -41,16 +41,52 @@ function getBTCPrice() {
   return null;
 }
 
-// 根据趋势选择上涨或下跌
+// 计算加权移动平均线 (WMA)
+function calculateWeightedMovingAverage(prices, period) {
+  if (prices.length < period) return null;
+
+  const slice = prices.slice(-period);
+  const weights = Array.from({ length: period }, (_, i) => i + 1);
+  const sum = slice.reduce((acc, price, index) => acc + price * weights[index], 0);
+  const weightSum = weights.reduce((acc, weight) => acc + weight, 0);
+  return sum / weightSum;
+}
+
+// 计算指数移动平均线 (EMA)
+function calculateExponentialMovingAverage(prices, period) {
+  if (prices.length < period) return null;
+
+  const k = 2 / (period + 1);
+  let ema = prices[0]; // 初始EMA值为第一天的价格
+
+  for (let i = 1; i < prices.length; i++) {
+    ema = (prices[i] - ema) * k + ema;
+  }
+
+  return ema;
+}
+
+// 根据移动平均线选择上涨或下跌
 function chooseBasedOnTrend() {
-  if (priceHistory.length < 2) {
+  const shortTermPeriod = 2; // 短期移动平均线周期
+  const longTermPeriod = 5;  // 长期移动平均线周期
+
+  if (priceHistory.length < longTermPeriod) {
     return Math.random() < 0.5 ? 'up' : 'down';
   }
 
-  const lastPrice = priceHistory[priceHistory.length - 1];
-  const previousPrice = priceHistory[priceHistory.length - 2];
+  const shortTermWMA = calculateWeightedMovingAverage(priceHistory, shortTermPeriod);
+  const longTermWMA = calculateWeightedMovingAverage(priceHistory, longTermPeriod);
 
-  return lastPrice > previousPrice ? 'up' : 'down';
+  const shortTermEMA = calculateExponentialMovingAverage(priceHistory, shortTermPeriod);
+  const longTermEMA = calculateExponentialMovingAverage(priceHistory, longTermPeriod);
+
+  // 比较不同的技术指标
+  if (shortTermEMA > longTermEMA || shortTermWMA > longTermWMA) {
+    return 'up';
+  } else {
+    return 'down';
+  }
 }
 
 // 随机选择上涨或下跌按钮并点击
@@ -121,6 +157,9 @@ function stopGuessing() {
   clearInterval(fuelRecoveryIntervalId);
   console.log('停止猜测');
 }
+
+// 启动定时器
+startGuessing();
 
 // 在控制台手动启动和停止定时器
 window.startGuessing = startGuessing;
