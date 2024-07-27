@@ -36,6 +36,21 @@ function getMaxFuelCount() {
     return 10; // 默认值，如果无法获取到最大燃料数
 }
 
+// 检查RefuelTimer_timer__LL1元素内容是否为空
+function isRefuelTimerContentEmpty() {
+    const refuelTimerElement = document.querySelector('.RefuelTimer_timer__LL1');
+    return refuelTimerElement && refuelTimerElement.textContent.trim() === '';
+}
+
+// 检查UserPointCounter的值
+function getUserPointCounterValue() {
+    const userPointElement = document.querySelector('.UserPointCounter_value__2a23E');
+    if (userPointElement) {
+        return parseInt(userPointElement.textContent, 10);
+    }
+    return 0;
+}
+
 // 保存价格历史数据
 let priceHistory = [];
 const maxHistoryLength = 5; // 设置保存的历史记录数量
@@ -97,31 +112,11 @@ function calculateRSI(prices, period) {
     return 100 - (100 / (1 + rs));
 }
 
-// 计算MACD
-function calculateMACD(prices, shortPeriod, longPeriod, signalPeriod) {
-    const shortEMA = calculateExponentialMovingAverage(prices, shortPeriod);
-    const longEMA = calculateExponentialMovingAverage(prices, longPeriod);
-    if (shortEMA === null || longEMA === null) return null;
-
-    const macdLine = shortEMA - longEMA;
-    const signalLine = calculateExponentialMovingAverage(prices.slice(-signalPeriod), signalPeriod);
-    if (signalLine === null) return null;
-
-    return {
-        macdLine: macdLine,
-        signalLine: signalLine,
-        histogram: macdLine - signalLine
-    };
-}
-
-// 根据技术指标选择上涨或下跌
+// 根据移动平均线选择上涨或下跌
 function chooseBasedOnTrend() {
     const shortTermPeriod = 2; // 短期移动平均线周期
     const longTermPeriod = 5;  // 长期移动平均线周期
     const rsiPeriod = 14;      // RSI周期
-    const macdShortPeriod = 12;
-    const macdLongPeriod = 26;
-    const macdSignalPeriod = 9;
 
     if (priceHistory.length < longTermPeriod) {
         return Math.random() < 0.5 ? 'up' : 'down';
@@ -135,17 +130,10 @@ function chooseBasedOnTrend() {
 
     const rsi = calculateRSI(priceHistory, rsiPeriod);
 
-    const macd = calculateMACD(priceHistory, macdShortPeriod, macdLongPeriod, macdSignalPeriod);
-
-    // 检查macd是否为null
-    if (macd === null) {
-        return Math.random() < 0.5 ? 'up' : 'down';
-    }
-
     // 综合考虑不同的技术指标
-    if ((shortTermEMA > longTermEMA || shortTermWMA > longTermWMA) && rsi < 70 && macd.histogram > 0) {
+    if ((shortTermEMA > longTermEMA || shortTermWMA > longTermWMA) && rsi < 70) {
         return 'up';
-    } else if (rsi > 30 && macd.histogram < 0) {
+    } else if (rsi > 30) {
         return 'down';
     } else {
         return Math.random() < 0.5 ? 'up' : 'down';
