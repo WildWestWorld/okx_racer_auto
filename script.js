@@ -36,9 +36,10 @@ function getMaxFuelCount() {
     return 10; // 默认值，如果无法获取到最大燃料数
 }
 
-// 检查是否存在RefuelTimer元素
-function isRefuelTimerPresent() {
-    return document.querySelector('.RefuelTimer_description__sD+HM') !== null;
+// 检查RefuelTimer_timer__LL1元素内容是否为空
+function isRefuelTimerContentEmpty() {
+    const refuelTimerElement = document.querySelector('.RefuelTimer_timer__LL1');
+    return refuelTimerElement && refuelTimerElement.textContent.trim() === '';
 }
 
 // 检查UserPointCounter的值
@@ -157,11 +158,10 @@ function guessBTCPrice() {
 // 定义定时器变量
 let guessIntervalId;
 let fuelRecoveryIntervalId;
+let pageRefreshIntervalId;
 
 // 开始定时器函数
 function startGuessing() {
-    let refuelCheckCount = 0;
-
     function checkFuelAndGuess() {
         const fuelCount = getFuelCount();
         const maxFuelCount = getMaxFuelCount();
@@ -190,38 +190,23 @@ function startGuessing() {
         }
     }
 
-    function checkRefuelStatus() {
-        const fuelCount = getFuelCount();
-        const maxFuelCount = getMaxFuelCount();
-        const userPointCounterValue = getUserPointCounterValue();
-
-        if (fuelCount === maxFuelCount) {
-            console.log('燃料已恢复，继续猜测');
-            checkFuelAndGuess();
-        } else if (userPointCounterValue <= 0 && !isRefuelTimerPresent()) {
-            refuelCheckCount++;
-            if (refuelCheckCount >= 3) {
-                console.log('未检测到RefuelTimer元素，刷新页面');
-                location.reload();
-            } else {
-                console.log('未检测到RefuelTimer元素，继续检查...');
-            }
-        } else {
-            refuelCheckCount = 0; // 重置计数
-            console.log('燃料未恢复，继续等待...');
-        }
-    }
-
     checkFuelAndGuess(); // 立即执行一次检查和猜测
 
     // 每隔30秒检查一次燃料恢复情况
-    fuelRecoveryIntervalId = setInterval(checkRefuelStatus, 30000); // 每30秒检查一次燃料情况
+    fuelRecoveryIntervalId = setInterval(checkFuelAndGuess, 30000); // 每30秒检查一次燃料情况
+
+    // 每15分钟刷新页面一次
+    pageRefreshIntervalId = setInterval(() => {
+        console.log('每15分钟刷新页面一次');
+        location.reload();
+    }, 15 * 60 * 1000); // 15分钟
 }
 
 // 停止定时器函数
 function stopGuessing() {
     clearInterval(guessIntervalId);
     clearInterval(fuelRecoveryIntervalId);
+    clearInterval(pageRefreshIntervalId);
     console.log('停止猜测');
 }
 
