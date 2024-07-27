@@ -105,6 +105,7 @@ function calculateMACD(prices, shortPeriod, longPeriod, signalPeriod) {
 
     const macdLine = shortEMA - longEMA;
     const signalLine = calculateExponentialMovingAverage(prices.slice(-signalPeriod), signalPeriod);
+    if (signalLine === null) return null;
 
     return {
         macdLine: macdLine,
@@ -135,6 +136,11 @@ function chooseBasedOnTrend() {
     const rsi = calculateRSI(priceHistory, rsiPeriod);
 
     const macd = calculateMACD(priceHistory, macdShortPeriod, macdLongPeriod, macdSignalPeriod);
+
+    // 检查macd是否为null
+    if (macd === null) {
+        return Math.random() < 0.5 ? 'up' : 'down';
+    }
 
     // 综合考虑不同的技术指标
     if ((shortTermEMA > longTermEMA || shortTermWMA > longTermWMA) && rsi < 70 && macd.histogram > 0) {
