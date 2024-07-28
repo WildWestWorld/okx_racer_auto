@@ -36,24 +36,9 @@ function getMaxFuelCount() {
     return 10; // 默认值，如果无法获取到最大燃料数
 }
 
-// 检查RefuelTimer_timer__LL1元素内容是否为空
-function isRefuelTimerContentEmpty() {
-    const refuelTimerElement = document.querySelector('.RefuelTimer_timer__LL1');
-    return refuelTimerElement && refuelTimerElement.textContent.trim() === '';
-}
-
-// 检查UserPointCounter的值
-function getUserPointCounterValue() {
-    const userPointElement = document.querySelector('.UserPointCounter_value__2a23E');
-    if (userPointElement) {
-        return parseInt(userPointElement.textContent, 10);
-    }
-    return 0;
-}
-
 // 保存价格历史数据
 let priceHistory = [];
-const maxHistoryLength = 5; // 设置保存的历史记录数量
+const maxHistoryLength = 14; // 设置保存的历史记录数量，增加到14以用于RSI计算
 
 // 获取BTC价格
 function getBTCPrice() {
@@ -112,14 +97,34 @@ function calculateRSI(prices, period) {
     return 100 - (100 / (1 + rs));
 }
 
-// 根据移动平均线选择上涨或下跌
+// 计算MACD
+function calculateMACD(prices, shortPeriod, longPeriod, signalPeriod) {
+    const shortEMA = calculateExponentialMovingAverage(prices, shortPeriod);
+    const longEMA = calculateExponentialMovingAverage(prices, longPeriod);
+    if (shortEMA === null || longEMA === null) return null;
+
+    const macdLine = shortEMA - longEMA;
+    const signalLine = calculateExponentialMovingAverage(prices.slice(-signalPeriod), signalPeriod);
+    if (signalLine === null) return null;
+
+    return {
+        macdLine: macdLine,
+        signalLine: signalLine,
+        histogram: macdLine - signalLine
+    };
+}
+
+// 综合多个指标进行预测
 function chooseBasedOnTrend() {
-    const shortTermPeriod = 2; // 短期移动平均线周期
-    const longTermPeriod = 5;  // 长期移动平均线周期
+    const shortTermPeriod = 5; // 短期移动平均线周期
+    const longTermPeriod = 14; // 长期移动平均线周期
     const rsiPeriod = 14;      // RSI周期
+    const macdShortPeriod = 12;
+    const macdLongPeriod = 26;
+    const macdSignalPeriod = 9;
 
     if (priceHistory.length < longTermPeriod) {
-        return Math.random() < 0.5 ? 'up' : 'down';
+        return Math.random() < 0.6 ? 'up' : 'down';
     }
 
     const shortTermWMA = calculateWeightedMovingAverage(priceHistory, shortTermPeriod);
@@ -130,13 +135,30 @@ function chooseBasedOnTrend() {
 
     const rsi = calculateRSI(priceHistory, rsiPeriod);
 
-    // 综合考虑不同的技术指标
-    if ((shortTermEMA > longTermEMA || shortTermWMA > longTermWMA) && rsi < 70) {
+    const macd = calculateMACD(priceHistory, macdShortPeriod, macdLongPeriod, macdSignalPeriod);
+
+    // 确认趋势逻辑
+    let upSignal = 0;
+    let downSignal = 0;
+
+    if (shortTermEMA > longTermEMA) upSignal++;
+    else downSignal++;
+
+    if (shortTermWMA > longTermWMA) upSignal++;
+    else downSignal++;
+
+    if (macd && macd.histogram > 0) upSignal++;
+    else downSignal++;
+
+    if (rsi < 30) upSignal++; // RSI低于30表示超卖，可能上涨
+    else if (rsi > 70) downSignal++; // RSI高于70表示超买，可能下跌
+
+    if (upSignal > downSignal) {
         return 'up';
-    } else if (rsi > 30) {
+    } else if (downSignal > upSignal) {
         return 'down';
     } else {
-        return Math.random() < 0.5 ? 'up' : 'down';
+        return Math.random() < 0.6 ? 'up' : 'down'; // 当信号一致时增加上涨概率
     }
 }
 
@@ -159,47 +181,81 @@ function guessBTCPrice() {
 let guessIntervalId;
 let fuelRecoveryIntervalId;
 let pageRefreshIntervalId;
+let fuelCheckingIntervalId;
+
+// 检查燃料并开始猜测
+function checkFuelAndGuess() {
+    const fuelCount = getFuelCount();
+    const maxFuelCount = getMaxFuelCount();
+    console.log(`当前燃料: ${fuelCount}/${maxFuelCount}`);
+
+    if (fuelCount > 0) {
+        // 更新价格历史
+        const currentPrice = getBTCPrice();
+        if (currentPrice !== null) {
+            priceHistory.push(currentPrice);
+            if (priceHistory.length > maxHistoryLength) {
+                priceHistory.shift(); // 保持价格历史在指定的长度
+            }
+            console.log(`当前价格: ${currentPrice}`);
+        }
+
+        // 进行BTC价格的猜测
+        guessBTCPrice();
+
+        // 设置随机的猜测时间间隔
+        const randomInterval = Math.floor(Math.random() * 2500) + 2500; // 随机时间在2.5秒到5秒之间
+        clearInterval(guessIntervalId);
+        guessIntervalId = setInterval(checkFuelAndGuess, randomInterval);
+    } else {
+        console.log('燃料耗尽，等待恢复...');
+        clearInterval(guessIntervalId);
+    }
+}
 
 // 开始定时器函数
 function startGuessing() {
-    function checkFuelAndGuess() {
+    // 检查燃料恢复情况并开始猜测
+    function startGuessingWhenFuelFull() {
         const fuelCount = getFuelCount();
         const maxFuelCount = getMaxFuelCount();
-        console.log(`当前燃料: ${fuelCount}/${maxFuelCount}`);
-
-        if (fuelCount > 0) {
-            // 更新价格历史
-            const currentPrice = getBTCPrice();
-            if (currentPrice !== null) {
-                priceHistory.push(currentPrice);
-                if (priceHistory.length > maxHistoryLength) {
-                    priceHistory.shift(); // 保持价格历史在指定的长度
-                }
-                console.log(`当前价格: ${currentPrice}`);
-            }
-
-            // 进行BTC价格的猜测
-            guessBTCPrice();
-
-            // 设置随机的猜测时间间隔
-            const randomInterval = Math.floor(Math.random() * 5000) + 5000; // 随机时间在5秒到10秒之间
-            clearInterval(guessIntervalId);
-            guessIntervalId = setInterval(checkFuelAndGuess, randomInterval);
+        if (fuelCount === maxFuelCount && priceHistory.length >= maxHistoryLength) {
+            console.log('燃料已满，开始猜测');
+            checkFuelAndGuess();
+            clearInterval(fuelCheckingIntervalId);
+            fuelCheckingIntervalId = setInterval(checkFuelAndGuess, 30000); // 每30秒检查一次燃料情况
         } else {
-            console.log('燃料耗尽，等待恢复...');
+            console.log('燃料未满或数据不足，等待恢复...');
         }
     }
 
-    checkFuelAndGuess(); // 立即执行一次检查和猜测
+    // 收集价格数据的函数
+    function collectPriceData() {
+        const currentPrice = getBTCPrice();
+        if (currentPrice !== null) {
+            priceHistory.push(currentPrice);
+            if (priceHistory.length > maxHistoryLength) {
+                priceHistory.shift(); // 保持价格历史在指定的长度
+            }
+            console.log(`收集价格数据: ${currentPrice}`);
+        }
+
+        if (priceHistory.length >= maxHistoryLength) {
+            clearInterval(priceDataIntervalId);
+            startGuessingWhenFuelFull(); // 确保价格数据足够后立即检查燃料并开始猜测
+        }
+    }
+
+    const priceDataIntervalId = setInterval(collectPriceData, 1000); // 每秒收集一次价格数据
 
     // 每隔30秒检查一次燃料恢复情况
-    fuelRecoveryIntervalId = setInterval(checkFuelAndGuess, 30000); // 每30秒检查一次燃料情况
+    fuelRecoveryIntervalId = setInterval(startGuessingWhenFuelFull, 30000); // 每30秒检查一次燃料情况
 
-    // 每15分钟刷新页面一次
+    // 每10分钟刷新页面一次
     pageRefreshIntervalId = setInterval(() => {
-        console.log('每15分钟刷新页面一次');
+        console.log('每10分钟刷新页面一次');
         location.reload();
-    }, 15 * 60 * 1000); // 15分钟
+    }, 10 * 60 * 1000); // 10分钟
 }
 
 // 停止定时器函数
@@ -207,6 +263,7 @@ function stopGuessing() {
     clearInterval(guessIntervalId);
     clearInterval(fuelRecoveryIntervalId);
     clearInterval(pageRefreshIntervalId);
+    clearInterval(fuelCheckingIntervalId);
     console.log('停止猜测');
 }
 
