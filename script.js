@@ -38,7 +38,7 @@ function getMaxFuelCount() {
 
 // 保存价格历史数据
 let priceHistory = [];
-const maxHistoryLength = 14; // 设置保存的历史记录数量，增加到14以用于RSI计算
+const maxHistoryLength = 20; // 设置保存的历史记录数量，增加到20以用于短期和布林带计算
 
 // 获取BTC价格
 function getBTCPrice() {
@@ -82,7 +82,7 @@ function calculateRSI(prices, period) {
     let gains = 0;
     let losses = 0;
 
-    for (let i = 1; i <= period; i++) {
+    for (let i = 1; i < period; i++) {
         const difference = prices[i] - prices[i - 1];
         if (difference >= 0) {
             gains += difference;
@@ -95,6 +95,22 @@ function calculateRSI(prices, period) {
     const avgLoss = losses / period;
     const rs = avgGain / avgLoss;
     return 100 - (100 / (1 + rs));
+}
+
+// 计算布林带
+function calculateBollingerBands(prices, period = 20, k = 2) {
+    if (prices.length < period) return null;
+
+    const slice = prices.slice(-period);
+    const sma = slice.reduce((acc, price) => acc + price, 0) / period;
+    const variance = slice.reduce((acc, price) => acc + Math.pow(price - sma, 2), 0) / period;
+    const stdDev = Math.sqrt(variance);
+
+    return {
+        upper: sma + k * stdDev,
+        lower: sma - k * stdDev,
+        middle: sma
+    };
 }
 
 // 计算MACD
@@ -137,6 +153,8 @@ function chooseBasedOnTrend() {
 
     const macd = calculateMACD(priceHistory, macdShortPeriod, macdLongPeriod, macdSignalPeriod);
 
+    const bollingerBands = calculateBollingerBands(priceHistory);
+
     // 确认趋势逻辑
     let upSignal = 0;
     let downSignal = 0;
@@ -152,6 +170,11 @@ function chooseBasedOnTrend() {
 
     if (rsi < 30) upSignal++; // RSI低于30表示超卖，可能上涨
     else if (rsi > 70) downSignal++; // RSI高于70表示超买，可能下跌
+
+    if (bollingerBands) {
+        if (priceHistory[priceHistory.length - 1] < bollingerBands.lower) upSignal++;
+        if (priceHistory[priceHistory.length - 1] > bollingerBands.upper) downSignal++;
+    }
 
     if (upSignal > downSignal) {
         return 'up';
@@ -251,11 +274,11 @@ function startGuessing() {
     // 每隔30秒检查一次燃料恢复情况
     fuelRecoveryIntervalId = setInterval(startGuessingWhenFuelFull, 30000); // 每30秒检查一次燃料情况
 
-    // 每5分钟刷新页面一次
+    // 每7分钟刷新页面一次
     pageRefreshIntervalId = setInterval(() => {
-        console.log('每5分钟刷新页面一次');
+        console.log('每7分钟刷新页面一次');
         location.reload();
-    }, 5 * 60 * 1000); // 5分钟
+    }, 7 * 60 * 1000); // 7分钟
 }
 
 // 停止定时器函数
