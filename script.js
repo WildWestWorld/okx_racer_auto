@@ -251,11 +251,11 @@ function startGuessing() {
     // 每隔30秒检查一次燃料恢复情况
     fuelRecoveryIntervalId = setInterval(startGuessingWhenFuelFull, 30000); // 每30秒检查一次燃料情况
 
-    // 每10分钟刷新页面一次
+    // 每5分钟刷新页面一次
     pageRefreshIntervalId = setInterval(() => {
-        console.log('每10分钟刷新页面一次');
+        console.log('每5分钟刷新页面一次');
         location.reload();
-    }, 10 * 60 * 1000); // 10分钟
+    }, 5 * 60 * 1000); // 5分钟
 }
 
 // 停止定时器函数
